@@ -31,6 +31,7 @@ class CodeCollector:
         self.config = config or {}
         self.collected_files = []
         self.structure_tree = {}
+        self.existing_md_data = None  # 用于存储已有的 Markdown 解析结果
 
     def batch_import(self, file_paths: List[str]) -> Dict:
         """
@@ -189,27 +190,296 @@ class CodeCollector:
                 result["snippets"].append(snippet)
                 result["total_lines"] += snippet["lines"]
 
+        # 添加统计信息（用于合并模式兼容性）
+        language = self._detect_language(abs_path)
+        result["stats"] = {
+            "total_files": 1,
+            "total_lines": result["total_lines"],
+            "languages": {language: 1}
+        }
+
+        # 将 snippets 转换为合并模式兼容的格式
+        result["snippets"] = [{
+            "file_path": result["file_path"],
+            "snippets": result["snippets"]
+        }]
+
         return result
 
-    def generate_markdown(self, data: Dict, user_intent: str = "") -> str:
+    def parse_existing_markdown(self, md_path: str) -> Dict:
+        """
+        解析已有的 Markdown 文件，提取结构化数据
+
+        返回:
+            {
+                "header": "文件头部内容",
+                "files": {
+                    "core": [{"path": "...", "content": "...", "language": "..."}],
+                    "other": [{"path": "...", "content": "...", "language": "..."}]
+                },
+                "snippets": [{"file_path": "...", "snippets": [...]}],
+                "structure": "目录结构字符串",
+                "stats": {...},
+                "skipped_files": [...]
+            }
+        """
+        if not os.path.exists(md_path):
+            return None
+
+        with open(md_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        result = {
+            "header": "",
+            "files": {"core": [], "other": []},
+            "snippets": [],
+            "structure": "",
+            "stats": {},
+            "skipped_files": []
+        }
+
+        # 提取文件头部（从开始到第一个 ## 标题）
+        header_match = re.search(r'^(.*?)(?=^## )', content, re.MULTILINE | re.DOTALL)
+        if header_match:
+            result["header"] = header_match.group(1)
+
+        # 提取目录结构
+        structure_match = re.search(r'## 📁 目录结构\s*\n\s*```(?:text)?\n(.*?)\n```', content, re.DOTALL)
+        if structure_match:
+            result["structure"] = structure_match.group(1)
+
+        # 提取核心文件
+        core_section = re.search(r'## 🎯 核心文件\s*\n(.*?)(?=^## |$)', content, re.MULTILINE | re.DOTALL)
+        if core_section:
+            result["files"]["core"] = self._parse_file_sections(core_section.group(1))
+
+        # 提取普通文件
+        other_section = re.search(r'## 📄 代码文件\s*\n(.*?)(?=^## |$)', content, re.MULTILINE | re.DOTALL)
+        if other_section:
+            result["files"]["other"] = self._parse_file_sections(other_section.group(1))
+
+        # 提取代码片段
+        snippet_sections = re.finditer(r'## 📄 代码片段: (.+?)\n(.*?)(?=^## |$)', content, re.MULTILINE | re.DOTALL)
+        for match in snippet_sections:
+            file_path = match.group(1)
+            snippet_content = match.group(2)
+            snippets = self._parse_snippet_sections(snippet_content)
+            result["snippets"].append({"file_path": file_path, "snippets": snippets})
+
+        # 提取跳过的文件
+        skipped_section = re.search(r'## ⚠️ 跳过的文件\s*\n(.*?)(?=^## |$)', content, re.MULTILINE | re.DOTALL)
+        if skipped_section:
+            result["skipped_files"] = self._parse_skipped_files(skipped_section.group(1))
+
+        return result
+
+    def _parse_file_sections(self, section_content: str) -> List[Dict]:
+        """解析文件段落"""
+        files = []
+        file_matches = re.finditer(r'### File: (.+?)\n\s*```(\w+)?\n(.*?)\n```', section_content, re.DOTALL)
+        for match in file_matches:
+            files.append({
+                "path": match.group(1),
+                "language": match.group(2) or "text",
+                "content": match.group(3)
+            })
+        return files
+
+    def _parse_snippet_sections(self, section_content: str) -> List[Dict]:
+        """解析代码片段段落"""
+        snippets = []
+
+        # 匹配函数/类片段
+        func_matches = re.finditer(r'### (Function|Class|Method): (.+?)\n\s*```.*?\n(.*?)\n```', section_content, re.DOTALL)
+        for match in func_matches:
+            snippets.append({
+                "type": match.group(1).lower(),
+                "name": match.group(2),
+                "content": match.group(3)
+            })
+
+        # 匹配行范围片段
+        line_matches = re.finditer(r'### 行 (\d+-\d+)\n\s*```.*?\n(.*?)\n```', section_content, re.DOTALL)
+        for match in line_matches:
+            snippets.append({
+                "type": "lines",
+                "range": match.group(1),
+                "content": match.group(2)
+            })
+
+        return snippets
+
+    def _parse_skipped_files(self, section_content: str) -> List[Dict]:
+        """解析跳过的文件列表"""
+        skipped = []
+        file_matches = re.finditer(r'### (.+?)\n(.*?)(?=### |$)', section_content, re.DOTALL)
+        for match in file_matches:
+            file_path = match.group(1)
+            details = match.group(2)
+
+            reason_match = re.search(r'\*\*原因\*\*：(.+)', details)
+            size_match = re.search(r'\*\*文件大小\*\*：(.+)', details)
+
+            skipped.append({
+                "path": file_path,
+                "reason": reason_match.group(1) if reason_match else "未知原因",
+                "size_kb": float(size_match.group(1).split()[0]) if size_match else None
+            })
+
+        return skipped
+
+    def merge_markdown_data(self, existing: Dict, new_data: Dict) -> Dict:
+        """
+        合并新旧数据
+
+        参数:
+            existing: 已有的解析数据
+            new_data: 新的数据（来自 batch_import 或 extract_snippets）
+
+        返回:
+            合并后的数据结构
+        """
+        if not existing:
+            return new_data
+
+        merged = {
+            "header": existing["header"],  # 保留原有头部
+            "files": existing["files"].copy() if "files" in existing else {"core": [], "other": []},
+            "snippets": existing["snippets"].copy() if "snippets" in existing else [],
+            "structure": existing["structure"],
+            "stats": existing["stats"].copy() if "stats" in existing else {},
+            "skipped_files": existing["skipped_files"].copy() if "skipped_files" in existing else []
+        }
+
+        # 合并文件列表（去重）
+        if "files" in new_data:
+            existing_paths = {f["path"] for f in merged["files"]["core"] + merged["files"]["other"]}
+
+            for file_info in new_data["files"]:
+                if file_info["path"] not in existing_paths:
+                    if self._is_core_file(file_info["path"]):
+                        merged["files"]["core"].append(file_info)
+                    else:
+                        merged["files"]["other"].append(file_info)
+
+        # 合并代码片段
+        if "snippets" in new_data:
+            # 查找是否已有该文件的片段
+            existing_snippet_files = {s["file_path"]: i for i, s in enumerate(merged["snippets"])}
+
+            for snippet_data in new_data["snippets"]:
+                file_path = snippet_data["file_path"]
+                if file_path in existing_snippet_files:
+                    # 合并到已有文件的片段列表（去重）
+                    idx = existing_snippet_files[file_path]
+                    existing_snippet_names = {
+                        s.get("name") or s.get("range")
+                        for s in merged["snippets"][idx]["snippets"]
+                    }
+
+                    for snippet in snippet_data["snippets"]:
+                        snippet_id = snippet.get("name") or snippet.get("range")
+                        if snippet_id not in existing_snippet_names:
+                            merged["snippets"][idx]["snippets"].append(snippet)
+                else:
+                    # 添加新文件的片段
+                    merged["snippets"].append(snippet_data)
+
+        # 合并目录结构
+        if "structure" in new_data and new_data["structure"]:
+            merged["structure"] = self._merge_tree_structures(
+                existing["structure"],
+                new_data["structure"]
+            )
+
+        # 更新跳过的文件列表（移除已成功提取的）
+        if "snippets" in new_data:
+            extracted_files = {s["file_path"] for s in new_data.get("snippets", [])}
+            merged["skipped_files"] = [
+                s for s in merged["skipped_files"]
+                if s["path"] not in extracted_files
+            ]
+
+        # 添加新跳过的文件（去重）
+        if "skipped_files" in new_data:
+            existing_skipped_paths = {s["path"] for s in merged["skipped_files"]}
+            for skipped in new_data["skipped_files"]:
+                if skipped["path"] not in existing_skipped_paths:
+                    merged["skipped_files"].append(skipped)
+
+        # 更新统计信息
+        if "stats" in new_data:
+            merged["stats"]["total_files"] = (
+                len(merged["files"]["core"]) +
+                len(merged["files"]["other"]) +
+                len(merged["snippets"])
+            )
+            merged["stats"]["total_lines"] = existing["stats"].get("total_lines", 0) + new_data["stats"].get("total_lines", 0)
+
+            # 合并语言统计
+            merged["stats"]["languages"] = existing["stats"].get("languages", {}).copy()
+            for lang, count in new_data["stats"].get("languages", {}).items():
+                merged["stats"]["languages"][lang] = merged["stats"]["languages"].get(lang, 0) + count
+
+        return merged
+
+    def _merge_tree_structures(self, existing: str, new: str) -> str:
+        """合并两个树形目录结构"""
+        if not existing:
+            return new
+        if not new:
+            return existing
+
+        # 简化处理：将两个树合并（实际场景中可以更智能地合并）
+        # 提取所有文件路径，重新生成树
+        def extract_paths(tree_str: str) -> Set[str]:
+            paths = set()
+            for line in tree_str.split('\n'):
+                # 移除树形字符，提取路径
+                clean_line = re.sub(r'[├└│─\s]+', '', line).strip('/')
+                if clean_line:
+                    paths.add(clean_line)
+            return paths
+
+        existing_paths = extract_paths(existing)
+        new_paths = extract_paths(new)
+        all_paths = existing_paths | new_paths
+
+        # 这里简化处理，返回原有结构（实际可以重新生成完整树）
+        return existing
+
+    def generate_markdown(self, data: Dict, user_intent: str = "", append_mode: bool = False, existing_md_path: str = None) -> str:
         """
         生成 Markdown 文档
 
         参数:
             data: batch_import 或 extract_snippets 返回的数据
             user_intent: 用户意图描述
+            append_mode: 是否为追加模式（智能合并到对应区域）
+            existing_md_path: 已有 Markdown 文件路径（追加模式需要）
 
         返回:
             完整的 Markdown 字符串
         """
+        # 追加模式：解析已有文件并合并数据
+        if append_mode and existing_md_path:
+            existing_data = self.parse_existing_markdown(existing_md_path)
+            if existing_data:
+                # 合并数据
+                data = self.merge_markdown_data(existing_data, data)
+
         md_parts = []
 
-        # 标题
+        # 标题和元信息
         project_name = self.project_path.name
         md_parts.append(f"# Project: {project_name}\n")
 
         # 元信息
-        md_parts.append(f"**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if append_mode and existing_md_path:
+            md_parts.append(f"**最后更新**: {update_time}\n")
+        else:
+            md_parts.append(f"**生成时间**: {update_time}\n")
 
         if user_intent:
             md_parts.append(f"**收集目的**: {user_intent}\n")
@@ -227,9 +497,23 @@ class CodeCollector:
             md_parts.append(data["structure"])
             md_parts.append("\n```\n\n---\n\n")
 
-        # 文件内容（批量导入模式）
-        if "files" in data:
-            # 核心文件优先
+        # 文件内容（批量导入模式 - 支持合并后的数据）
+        if "files" in data and isinstance(data["files"], dict):
+            # 处理合并后的数据结构
+            core_files = data["files"].get("core", [])
+            other_files = data["files"].get("other", [])
+
+            if core_files:
+                md_parts.append("## 🎯 核心文件\n\n")
+                for file_info in core_files:
+                    md_parts.append(self._format_file_section(file_info))
+
+            if other_files:
+                md_parts.append("## 📄 代码文件\n\n")
+                for file_info in other_files:
+                    md_parts.append(self._format_file_section(file_info))
+        elif "files" in data and isinstance(data["files"], list):
+            # 处理原始数据结构（首次生成）
             core_files = []
             other_files = []
 
@@ -249,11 +533,20 @@ class CodeCollector:
                 for file_info in other_files:
                     md_parts.append(self._format_file_section(file_info))
 
-        # 代码片段（片段提取模式）
+        # 代码片段（片段提取模式 - 支持合并后的数据）
         if "snippets" in data:
-            md_parts.append(f"## 📄 代码片段: {data['file_path']}\n\n")
-            for snippet in data["snippets"]:
-                md_parts.append(self._format_snippet_section(snippet))
+            if isinstance(data["snippets"], list) and len(data["snippets"]) > 0:
+                # 合并后的数据结构
+                if isinstance(data["snippets"][0], dict) and "file_path" in data["snippets"][0]:
+                    for snippet_group in data["snippets"]:
+                        md_parts.append(f"## 📄 代码片段: {snippet_group['file_path']}\n\n")
+                        for snippet in snippet_group["snippets"]:
+                            md_parts.append(self._format_snippet_section(snippet))
+                # 原始数据结构（首次生成）
+                else:
+                    md_parts.append(f"## 📄 代码片段: {data.get('file_path', '未知')}\n\n")
+                    for snippet in data["snippets"]:
+                        md_parts.append(self._format_snippet_section(snippet))
 
         # 统计信息
         if "stats" in data:
@@ -392,11 +685,12 @@ class CodeCollector:
                 pattern = rf'^\s*class\s+{re.escape(name)}\s*[\(:]'
             else:
                 return None, 0
-        elif file_ext in ['.js', '.ts', '.jsx', '.tsx']:
+        elif file_ext in ['.js', '.ts', '.jsx', '.tsx', '.html', '.htm', '.vue']:
             if element_type == 'function':
-                pattern = rf'(function\s+{re.escape(name)}\s*\(|const\s+{re.escape(name)}\s*=|\s+{re.escape(name)}\s*\()'
+                # 更精确的函数定义模式，排除函数调用
+                pattern = rf'(^\s*function\s+{re.escape(name)}\s*\(|^\s*async\s+function\s+{re.escape(name)}\s*\(|^\s*const\s+{re.escape(name)}\s*=|^\s*let\s+{re.escape(name)}\s*=|^\s*var\s+{re.escape(name)}\s*=)'
             elif element_type == 'class':
-                pattern = rf'class\s+{re.escape(name)}\s*'
+                pattern = rf'^\s*class\s+{re.escape(name)}\s*'
             else:
                 return None, 0
         elif file_ext in ['.java', '.kt', '.cs']:
@@ -420,7 +714,49 @@ class CodeCollector:
         if start_line is None:
             return None, 0
 
-        # 确定结束行（基于缩进）
+        # 根据文件类型选择不同的结束行判断策略
+        if file_ext in ['.js', '.ts', '.jsx', '.tsx', '.html', '.htm', '.vue', '.java', '.kt', '.cs', '.cpp', '.c']:
+            # 对于大括号语言，使用括号匹配
+            end_line = self._find_closing_brace(lines, start_line)
+        else:
+            # 对于 Python 等缩进语言，使用缩进判断
+            end_line = self._find_end_by_indent(lines, start_line)
+
+        snippet_lines = lines[start_line:end_line]
+        return "\n".join(snippet_lines), len(snippet_lines)
+
+    def _find_closing_brace(self, lines: List[str], start_line: int) -> int:
+        """通过大括号配对找到代码块结束位置（用于 JavaScript/Java/C++ 等）"""
+        brace_count = 0
+        found_opening = False
+
+        for i in range(start_line, len(lines)):
+            line = lines[i]
+
+            # 跳过字符串和注释中的括号（简化处理）
+            # 移除单行注释
+            if '//' in line:
+                code_part = line[:line.index('//')]
+            else:
+                code_part = line
+
+            # 统计括号
+            for char in code_part:
+                if char == '{':
+                    brace_count += 1
+                    found_opening = True
+                elif char == '}':
+                    brace_count -= 1
+
+                # 找到匹配的闭括号
+                if found_opening and brace_count == 0:
+                    return i + 1
+
+        # 如果没有找到匹配的括号，返回文件末尾
+        return len(lines)
+
+    def _find_end_by_indent(self, lines: List[str], start_line: int) -> int:
+        """通过缩进判断代码块结束位置（用于 Python 等）"""
         base_indent = len(lines[start_line]) - len(lines[start_line].lstrip())
         end_line = start_line + 1
 
@@ -438,8 +774,7 @@ class CodeCollector:
         else:
             end_line = len(lines)
 
-        snippet_lines = lines[start_line:end_line]
-        return "\n".join(snippet_lines), len(snippet_lines)
+        return end_line
 
     def _is_core_file(self, file_path: str) -> bool:
         """判断是否为核心文件"""
@@ -487,6 +822,8 @@ def main():
     parser.add_argument('--intent', help='用户意图描述')
     parser.add_argument('--config', help='配置文件路径（JSON）')
     parser.add_argument('--output', help='输出文件路径')
+    parser.add_argument('--append', action='store_true',
+                        help='追加模式：向现有文件追加内容，而不是覆盖')
 
     args = parser.parse_args()
 
@@ -538,14 +875,21 @@ def main():
             print("建议: 使用 --mode snippets 指定函数/类名或行号范围提取")
         print("=" * 60 + "\n")
 
-    # 生成 Markdown
-    markdown = collector.generate_markdown(data, args.intent or "")
+    # 生成 Markdown（追加模式时传入已有文件路径）
+    markdown = collector.generate_markdown(
+        data,
+        args.intent or "",
+        append_mode=args.append,
+        existing_md_path=args.output if args.append else None
+    )
 
-    # 输出
+    # 输出（追加模式统一使用覆盖写入，因为已经在内存中合并了）
     if args.output:
         with open(args.output, 'w', encoding='utf-8') as f:
             f.write(markdown)
-        print(f"✅ 已保存到: {args.output}")
+
+        action = "已合并更新到" if args.append else "已保存到"
+        print(f"✅ {action}: {args.output}")
     else:
         print(markdown)
 
