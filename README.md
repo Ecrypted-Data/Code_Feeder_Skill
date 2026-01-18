@@ -197,3 +197,7 @@ code-feeder/
 ## 📄 许可证
 
 本项目基于 MIT 许可证开源 - 详见 [LICENSE](LICENSE) 文件。
+
+## 🙏 鸣谢
+
+本项目受 [AI_CodeFeeder_by_py](https://github.com/ChaoPhone/AI_CodeFeeder_by_py) 启发而开发，特此感谢。
