@@ -4,116 +4,118 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Claude](https://img.shields.io/badge/Skill-Claude%20Code-purple)
 
-> **智能代码收集器** — 自动化收集项目代码，智能记录用户意图，一键生成 AI 友好的上下文文档。
+[🇬🇧 English Documentation](README.md) | [🇨🇳 中文文档](README_ZH.md)
 
-> 🙏 **鸣谢**：本项目灵感来源于 [AI_CodeFeeder_by_py](https://github.com/ChaoPhone/AI_CodeFeeder_by_py)，特此感谢原作者的启发。
+> **Intelligent Code Collector** — Automatically collects project code, intelligently records user intent, and generates AI-friendly context documentation with one click.
 
-**Code Feeder** 是专为 **Claude Code** 打造的 Skill，它能将你的 CLI Agent 升级为智能上下文收集专家。
+> 🙏 **Acknowledgements**: This project is inspired by [AI_CodeFeeder_by_py](https://github.com/ChaoPhone/AI_CodeFeeder_by_py), special thanks to the original author for the inspiration.
 
-旨在解决与 AI 协作时的痛点：**如何高效地将项目上下文提供给 LLM?** 它能自动化收集代码、生成目录结构、并记录你的意图，让你能直接将生成的 Markdown "喂"给 WEB 端的 AI，**无需重复解释背景**。
+**Code Feeder** is a Skill built specifically for **Claude Code**, upgrading your CLI Agent into an intelligent context collection expert.
 
----
-
-## 🤔 为什么需要 Code Feeder？
-
-即使你已经拥有 Cursor、GitHub Copilot 或 Claude CLI，此工具依然是**深度开发**的必备补充：
-
-1.  **🧠 更纯粹的代码洞察力**：
-    IDE 和 CLI 中的 AI 往往负载了大量工具（Tools）、MCP 协议和环境上下文。过多的干扰有时会导致模型对代码本身的**注意力分散**。相比之下，将纯净的代码上下文提供给 Web 端 AI，往往能获得更深刻的逻辑分析和架构建议。
-
-2.  **🚀 官方 Web 端的性能优势**：
-    实践表明，官方 Web 端（如 ChatGPT Plus, Claude.ai, DeepSeek Web）的模型往往拥有**更强的推理能力**和隐藏的思维链优化，在处理复杂重构或疑难 Bug 时，表现常优于通过 API 调用的后端模型。
-
-3.  **💰 显著降低 Token 开销**：
-    与其在 CLI 中消耗昂贵的 API 额度进行反复试错和长对话，不如一键生成精准的上下文文档，利用 Web 端（通常是包月制）的算力进行无限制的深度探讨。
+It aims to solve the pain point of collaborating with AI: **How to efficiently provide project context to LLMs?** It automates code collection, generates directory structures, and records your intent, allowing you to "feed" the generated Markdown directly to WEB-based AI, **without repeating background explanations**.
 
 ---
 
-## ✨ 核心特性
+## 🤔 Why Code Feeder?
 
-- **🎯 用户意图自动记录**：在收集代码时记录你的目的（如"重构认证模块"），生成文档时自动包含意图说明，外部 AI 一看即懂。
-- **🚀 两种收集模式**：
-  - **批量导入**：适合小型项目，一键打包所有相关文件。
-  - **智能片段提取**：适合大型项目，支持按**函数名**、**类名**或**行号**精准提取，无需手动复制粘贴。
-- **🌲 自动结构可视化**：智能生成项目目录树，清晰展示代码组织结构。
-- **🤖 项目类型检测**：自动识别 React, Django, Rust, Unity 等 12+ 种项目类型，智能应用最佳过滤规则。
-- **📊 自动统计分析**：提供代码行数、语言占比、核心文件识别等统计数据。
+Even if you already use Cursor, GitHub Copilot, or Claude CLI, this tool is an essential supplement for **deep development**:
+
+1.  **🧠 Pure Code Insight**:
+    IDE and CLI AIs are often burdened with many Tools, MCP protocols, and environmental context. Excessive interference can sometimes distract the model from the code itself. In contrast, providing clean code context to Web-based AI often yields deeper logical analysis and architectural advice.
+
+2.  **🚀 Official Web Performance**:
+    Experience shows that official Web models (like ChatGPT Plus, Claude.ai, Gemini Web) often possess **stronger reasoning capabilities** and hidden chain-of-thought optimizations. They frequently outperform API-based backend models when dealing with complex refactoring or difficult bugs.
+
+3.  **💰 Significantly Reduced Token Costs**:
+    Instead of consuming expensive API quotas for repeated trial and error in the CLI, generate precise context documentation with one click and leverage the (often flat-rate) Web interface for unlimited deep exploration.
 
 ---
 
-## 🛠 支持的项目类型
+## ✨ Core Features
 
-系统会自动检测以下类型并优化采集策略（忽略无关文件，优先核心文件）：
+- **🎯 Intent Recording**: Records your purpose (e.g., "refactor auth module") during collection, automatically including it in the generated docs so external AIs understand immediately.
+- **🚀 Two Collection Modes**:
+  - **Batch Import**: Ideal for small projects, packs all relevant files at once.
+  - **Smart Snippet Extraction**: Ideal for large projects, supports precise extraction by **function name**, **class name**, or **line numbers**, no manual copy-pasting required.
+- **🌲 Structure Visualization**: Intelligently generates project directory trees to clearly show code organization.
+- **🤖 Project Type Detection**: Automatically identifies 12+ project types like React, Django, Rust, Unity, applying optimal filtering rules.
+- **📊 Auto-Statistics**: Provides stats on line counts, language distribution, and core file identification.
 
-| 前端 | 后端/系统 | 其他 |
+---
+
+## 🛠 Supported Project Types
+
+System automatically detects types and optimizes collection strategy (ignoring irrelevant files, prioritizing core ones):
+
+| Frontend | Backend/System | Others |
 | :--- | :--- | :--- |
 | <img src="https://skillicons.dev/icons?i=react" width="20"/> React / Next.js | <img src="https://skillicons.dev/icons?i=django" width="20"/> Django | <img src="https://skillicons.dev/icons?i=unity" width="20"/> Unity |
 | <img src="https://skillicons.dev/icons?i=vue" width="20"/> Vue / Nuxt | <img src="https://skillicons.dev/icons?i=fastapi" width="20"/> FastAPI | <img src="https://skillicons.dev/icons?i=c" width="20"/> STM32 Embedded |
 | <img src="https://skillicons.dev/icons?i=nodejs" width="20"/> Node.js | <img src="https://skillicons.dev/icons?i=rust" width="20"/> Rust / Go | 🐍 Python (Generic) |
 
-*以及 Java, C#, C++, PHP 等通用支持。*
+*And generic support for Java, C#, C++, PHP, etc.*
 
 ---
 
-## 🚀 安装说明
+## 🚀 Installation
 
-### 全局安装 (推荐)
+### Global Installation (Recommended)
 
-使 Code Feeder 在所有项目中可用：
+Make Code Feeder available in all projects:
 
-1.  进入 Claude Skills 目录：
+1.  Go to Claude Skills directory:
     *   **macOS/Linux**: `cd ~/.claude/skills`
     *   **Windows (PowerShell)**: `cd $env:USERPROFILE\.claude\skills`
-    *   *如果目录不存在，请先创建它。*
+    *   *Create the directory if it doesn't exist.*
 
-2.  克隆仓库：
+2.  Clone the repository:
     ```bash
     git clone https://github.com/Ecrypted-Data/Code_Feeder_Skill.git code-feeder
     ```
 
-3.  **验证安装**：
-    重启 Claude Code，然后询问：
+3.  **Verify Installation**:
+    Restart Claude Code, then ask:
     > "What skills do you have available?"
-    
-    如果看到 `code-feeder` 在列表中，说明安装成功！
 
-### 项目级安装
+    If you see `code-feeder` in the list, installation is successful!
 
-仅在当前项目中使用：
-在项目根目录下创建 `.claude/skills` 文件夹，然后将代码克隆到其中。
+### Project-level Installation
+
+Use only in the current project:
+Create a `.claude/skills` folder in your project root and clone the code into it.
 
 ---
 
-## 💡 使用方法
+## 💡 Usage
 
-### 在 Claude Code 中
+### In Claude Code
 
-直接与 Agent 对话：
+Talk directly to the Agent:
 
-> "使用 code-feeder 帮我收集项目代码，我想重构用户登录模块。"
+> "Use code-feeder to collect project code for me, I want to refactor the user login module."
 
-Agent 会自动：
-1. 询问你的具体意图。
-2. 检测项目类型。
-3. 执行收集并生成 `markdown` 文档。
+The Agent will automatically:
+1. Ask for your specific intent.
+2. Detect project type.
+3. Execute collection and generate `markdown` documentation.
 
-### 命令行手动使用
+### Manual CLI Usage
 
-你也可以直接运行 Python 脚本：
+You can also run the Python script directly:
 
-#### 1. 批量导入模式 (Batch)
-适合收集整个模块或小项目。
+#### 1. Batch Mode (Batch)
+Suitable for collecting entire modules or small projects.
 
 ```bash
 python scripts/code_collector.py /path/to/project \
   --mode batch \
   --files src/main.py src/utils.py \
-  --intent "分析主逻辑流程" \
+  --intent "Analyze main logic flow" \
   --output context.md
 ```
 
-#### 2. 片段提取模式 (Snippets)
-适合从大文件中提取特定函数或类。
+#### 2. Snippets Mode (Snippets)
+Suitable for extracting specific functions or classes from large files.
 
 ```bash
 python scripts/code_collector.py /path/to/project \
@@ -123,86 +125,87 @@ python scripts/code_collector.py /path/to/project \
     {\"type\": \"function\", \"name\": \"login\"},
     {\"type\": \"class\", \"name\": \"UserSession\"}
   ]" \
-  --intent "检查登录安全性" \
+  --intent "Check login security" \
   --output context.md
 ```
 
 ---
 
-## 🔍 功能详解
+## 🔍 Features Detail
 
-### 智能片段提取
-告别手动滚动几千行代码寻找函数。只需告诉工具函数名，它会自动定位并提取完整代码块（包括缩进）。
+### Smart Snippet Extraction
+Say goodbye to scrolling through thousands of lines to find a function. Just tell the tool the function name, and it automatically locates and extracts the complete code block (including indentation).
 
-支持语言：
+Supported languages:
 - Python, JavaScript, TypeScript
 - Java, Kotlin, C#
 - C, C++, Go, Rust
-- 更多...
+- And more...
 
-### 意图驱动的文档生成
-生成的 Markdown 文档不仅是代码堆砌，更是**任务说明书**。
+### Intent-Driven Documentation
+The generated Markdown is not just a code dump, but a **Task Manual**.
 
-**输出示例：**
+**Output Example:**
 ```markdown
 # Project: MyApp
-**生成时间**: 2026-01-18
-**收集目的**: 重构用户认证模块，分析安全性
+**Date**: 2026-01-18
+**Purpose**: Refactor user auth module, analyze security
 
-## 📁 目录结构
+## 📁 Directory Structure
 ...
 
-## 📄 代码内容
+## 📄 Code Content
 ...
 
-## 🎯 收集目的总结
-需要重构用户认证模块，希望 AI 分析现有代码的安全性和性能瓶颈。
-**提示**：以上代码已根据此目的收集整理，可直接用于相关分析或开发任务。
+## 🎯 Intent Summary
+Need to refactor the user authentication module, hoping AI will analyze security and performance bottlenecks in existing code.
+**Tip**: The code above has been collected based on this purpose and can be used directly for analysis or development tasks.
 ```
-*将此文档发送给 AI，它会立即理解："哦，你需要我分析认证模块的安全性和性能"，无需你再费口舌。*
+*Send this doc to AI, and it will immediately understand: "Oh, you need me to analyze auth security and performance," without extra explanation.*
 
 ---
 
-## ⚙️ 配置指南
+## ⚙️ Configuration
 
-配置文件位于 `config.json`。通常无需修改，系统会自动适配。
+Config file is at `config.json`. Usually no modification needed.
 
-**默认忽略：**
-`.git`, `node_modules`, `venv`, `__pycache__`, `dist`, `build` 等。
+**Default Ignores:**
+`.git`, `node_modules`, `venv`, `__pycache__`, `dist`, `build`, etc.
 
-**自定义配置：**
-你可以修改 `config.json` 来：
-- 添加自定义忽略目录。
-- 设置最大文件大小限制（默认 500KB）。
-- 定义项目的"核心文件"列表。
+**Custom Config:**
+You can modify `config.json` to:
+- Add custom ignore directories.
+- Set max file size limit (default 500KB).
+- Define "core files" list.
 
 ---
 
-## 📂 文件结构
+## 📂 File Structure
 
 ```text
 code-feeder/
-├── SKILL.md             # Claude Skill 核心指令与元数据
-├── README.md            # 项目说明文档
-├── config.json          # 默认配置文件
-├── project-types.json   # 项目类型检测规则
-└── scripts/             # 工具脚本目录
-    ├── code_collector.py      # 代码收集核心逻辑
-    └── detect_project.py      # 项目类型检测工具
+├── skill.md             # Claude Skill core instructions & metadata
+├── README.md            # English documentation
+├── README_ZH.md         # Chinese documentation
+├── config.json          # Default configuration
+├── project-types.json   # Project type detection rules
+└── scripts/             # Tool scripts directory
+    ├── code_collector.py      # Core collection logic
+    └── detect_project.py      # Project type detection tool
 ```
 
 ---
 
-## 🤝 贡献
+## 🤝 Contribution
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests are welcome!
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
+1. Fork this repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Submit Pull Request
 
-## 📄 许可证
+## 📄 License
 
-本项目基于 MIT 许可证开源 - 详见 [LICENSE](LICENSE) 文件。
+This project is open source under the MIT License - see [LICENSE](LICENSE) file for details.
