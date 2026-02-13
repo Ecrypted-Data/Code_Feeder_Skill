@@ -41,6 +41,10 @@ Even if you already use Cursor, GitHub Copilot, or Claude CLI, this tool is an e
 - **🚀 Two Collection Modes**:
   - **Batch Import**: Ideal for small projects, packs all relevant files at once.
   - **Smart Snippet Extraction**: Ideal for large projects, supports precise extraction by **function name**, **class name**, or **line numbers**, no manual copy-pasting required.
+- **🧹 Code Cleaning Modes**:
+  - **Comments Mode**: Removes comments, keeps implementations.
+  - **Skeleton Mode**: Extracts only function/class declarations, perfect for understanding APIs quickly.
+- **🗑️ Junk File Filtering**: Auto-filters STM32/Unity auto-generated files.
 - **🌲 Structure Visualization**: Intelligently generates project directory trees to clearly show code organization.
 - **🤖 Project Type Detection**: Automatically identifies 12+ project types like React, Django, Rust, Unity, applying optimal filtering rules.
 - **📊 Auto-Statistics**: Provides stats on line counts, language distribution, and core file identification.
@@ -133,6 +137,25 @@ python scripts/code_collector.py /path/to/project \
   --output context.md
 ```
 
+#### 3. Code Cleaning (Optional)
+Reduce noise for AI analysis by removing comments or extracting only declarations:
+
+```bash
+# Remove comments only
+python scripts/code_collector.py /path/to/project \
+  --mode batch --files "*.py" --clean comments --output ctx.md
+
+# Skeleton mode - only function/class declarations
+python scripts/code_collector.py /path/to/project \
+  --mode snippets --target main.js \
+  --ranges '[{"type":"function","name":"handleClick"}]' \
+  --clean skeleton --output ctx.md
+
+# Disable junk file filtering (STM32/Unity auto-generated files)
+python scripts/code_collector.py /path/to/project \
+  --mode batch --files "*.c" --no-junk-filter --output ctx.md
+```
+
 ---
 
 ## 🔍 Features Detail
@@ -195,6 +218,7 @@ code-feeder/
 ├── project-types.json   # Project type detection rules
 └── scripts/             # Tool scripts directory
     ├── code_collector.py      # Core collection logic
+    ├── code_cleaner.py        # Code cleaning (comments/skeleton)
     └── detect_project.py      # Project type detection tool
 ```
 

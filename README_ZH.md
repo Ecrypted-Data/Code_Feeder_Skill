@@ -37,6 +37,10 @@
 - **🚀 两种收集模式**：
   - **批量导入**：适合小型项目，一键打包所有相关文件。
   - **智能片段提取**：适合大型项目，支持按**函数名**、**类名**或**行号**精准提取，无需手动复制粘贴。
+- **🧹 代码清洗模式**：
+  - **去注释模式**：移除注释，保留实现代码。
+  - **骨架模式**：仅提取函数/类声明，快速了解 API。
+- **🗑️ 垃圾文件过滤**：自动过滤 STM32/Unity 自动生成的垃圾文件。
 - **🌲 自动结构可视化**：智能生成项目目录树，清晰展示代码组织结构。
 - **🤖 项目类型检测**：自动识别 React, Django, Rust, Unity 等 12+ 种项目类型，智能应用最佳过滤规则。
 - **📊 自动统计分析**：提供代码行数、语言占比、核心文件识别等统计数据。
@@ -129,6 +133,25 @@ python scripts/code_collector.py /path/to/project \
   --output context.md
 ```
 
+#### 3. 代码清洗 (可选)
+减少 AI 分析时的噪音，可选择移除注释或仅提取声明：
+
+```bash
+# 仅移除注释
+python scripts/code_collector.py /path/to/project \
+  --mode batch --files "*.py" --clean comments --output ctx.md
+
+# 骨架模式 - 仅提取函数/类声明
+python scripts/code_collector.py /path/to/project \
+  --mode snippets --target main.js \
+  --ranges '[{"type":"function","name":"handleClick"}]' \
+  --clean skeleton --output ctx.md
+
+# 禁用垃圾文件过滤 (STM32/Unity 自动生成文件)
+python scripts/code_collector.py /path/to/project \
+  --mode batch --files "*.c" --no-junk-filter --output ctx.md
+```
+
 ---
 
 ## 🔍 功能详解
@@ -191,6 +214,7 @@ code-feeder/
 ├── project-types.json   # 项目类型检测规则
 └── scripts/             # 工具脚本目录
     ├── code_collector.py      # 代码收集核心逻辑
+    ├── code_cleaner.py        # 代码清洗模块（去注释/骨架模式）
     └── detect_project.py      # 项目类型检测工具
 ```
 

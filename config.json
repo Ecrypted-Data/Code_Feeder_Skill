@@ -5,6 +5,7 @@
     ".cpp",
     ".c",
     ".h",
+    ".hpp",
     ".js",
     ".ts",
     ".jsx",
@@ -35,7 +36,9 @@
     ".cginc",
     ".txt",
     ".vue",
-    ".svelte"
+    ".svelte",
+    ".cc",
+    ".cxx"
   ],
   "ignore_dirs": [
     ".git",
@@ -101,5 +104,16 @@
   "max_file_size_kb": 200,
   "default_output_filename": "{project_name}_CodeContext.md",
   "include_stats": true,
-  "tree_indent": "    "
+  "tree_indent": "    ",
+  "clean_mode": "none",
+  "remove_junk": true,
+  "core_files": [
+    "main.py",
+    "app.py",
+    "index.js",
+    "App.vue",
+    "main.ts",
+    "src/main.rs",
+    "lib.rs"
+  ]
 }

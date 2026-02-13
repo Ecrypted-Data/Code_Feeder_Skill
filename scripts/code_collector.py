@@ -14,6 +14,13 @@ from typing import List, Dict, Tuple, Optional, Set
 from datetime import datetime
 import re
 
+# 尝试导入 code_cleaner 模块
+try:
+    from code_cleaner import clean_content_deeply, remove_comments, extract_code_skeleton, is_junk_filename
+    HAS_CODE_CLEANER = True
+except ImportError:
+    HAS_CODE_CLEANER = False
+
 # Windows 编码修复
 if sys.platform == 'win32':
     if sys.stdout.encoding != 'utf-8':
@@ -32,6 +39,9 @@ class CodeCollector:
         self.collected_files = []
         self.structure_tree = {}
         self.existing_md_data = None  # 用于存储已有的 Markdown 解析结果
+        # 代码清洗选项
+        self.clean_mode = self.config.get('clean_mode', 'none')  # none, comments, skeleton
+        self.remove_junk = self.config.get('remove_junk', True)  # 是否移除垃圾文件
 
     def batch_import(self, file_paths: List[str]) -> Dict:
         """
@@ -88,6 +98,23 @@ class CodeCollector:
                 rel_path = abs_path.relative_to(self.project_path)
             except ValueError:
                 rel_path = abs_path
+
+            # 垃圾文件过滤
+            if self.remove_junk and HAS_CODE_CLEANER:
+                if is_junk_filename(str(rel_path)):
+                    result["skipped_files"].append({
+                        "path": str(file_path),
+                        "reason": "垃圾文件（自动过滤）"
+                    })
+                    continue
+
+            # 代码清洗
+            if HAS_CODE_CLEANER and self.clean_mode != 'none':
+                ext = abs_path.suffix.lower()
+                if self.clean_mode == 'comments':
+                    content = remove_comments(content, ext)
+                elif self.clean_mode == 'skeleton':
+                    content = extract_code_skeleton(content, ext)
 
             # 语言检测
             language = self._detect_language(abs_path)
@@ -673,8 +700,16 @@ class CodeCollector:
         tree_lines = render_tree(tree)
         return "\n".join(tree_lines)
 
-    def _extract_by_name(self, content: str, name: str, element_type: str, file_ext: str) -> Tuple[Optional[str], int]:
-        """根据函数/类名提取代码"""
+    def _extract_by_name(self, content: str, name: str, element_type: str, file_ext: str, skeleton_mode: bool = False) -> Tuple[Optional[str], int]:
+        """根据函数/类名提取代码
+
+        参数:
+            content: 文件内容
+            name: 函数/类名
+            element_type: 类型 (function, class, method)
+            file_ext: 文件扩展名
+            skeleton_mode: 是否使用骨架模式（仅提取声明，去除实现）
+        """
         lines = content.splitlines()
 
         # 根据文件类型选择正则模式
@@ -700,6 +735,32 @@ class CodeCollector:
                 pattern = rf'class\s+{re.escape(name)}\s*'
             else:
                 return None, 0
+        elif file_ext in ['.go']:
+            # Go 语言函数支持
+            if element_type in ['function', 'method']:
+                pattern = rf'^\s*func\s+(?:\([^)]+\)\s*)?{re.escape(name)}\s*\('
+            elif element_type == 'type':
+                pattern = rf'^\s*type\s+{re.escape(name)}\s*'
+            else:
+                return None, 0
+        elif file_ext in ['.rs']:
+            # Rust 语言函数支持
+            if element_type in ['function', 'method']:
+                pattern = rf'^\s*(?:pub\s+)?fn\s+{re.escape(name)}\s*'
+            elif element_type == 'struct':
+                pattern = rf'^\s*(?:pub\s+)?struct\s+{re.escape(name)}\s*'
+            elif element_type == 'enum':
+                pattern = rf'^\s*(?:pub\s+)?enum\s+{re.escape(name)}\s*'
+            else:
+                return None, 0
+        elif file_ext in ['.cpp', '.cc', '.cxx', '.hpp']:
+            # C++ 支持
+            if element_type in ['function', 'method']:
+                pattern = rf'^\s*(?:template\s*<[^>]*>\s*)?(?:inline\s+)?(?:void|int|string|bool|auto|auto\s+|[\w:]+)\s+{re.escape(name)}\s*\('
+            elif element_type == 'class':
+                pattern = rf'^\s*class\s+{re.escape(name)}\s*(?::|\{)'
+            else:
+                return None, 0
         else:
             # 通用模式
             pattern = rf'\b{re.escape(name)}\b'
@@ -715,7 +776,18 @@ class CodeCollector:
             return None, 0
 
         # 根据文件类型选择不同的结束行判断策略
-        if file_ext in ['.js', '.ts', '.jsx', '.tsx', '.html', '.htm', '.vue', '.java', '.kt', '.cs', '.cpp', '.c']:
+        brace_languages = ['.js', '.ts', '.jsx', '.tsx', '.html', '.htm', '.vue',
+                          '.java', '.kt', '.cs', '.cpp', '.c', '.cc', '.cxx', '.h', '.hpp',
+                          '.go', '.rs']
+
+        if skeleton_mode and file_ext in brace_languages:
+            # 骨架模式：使用 code_cleaner 的 hollow_out_function_bodies
+            from code_cleaner import hollow_out_function_bodies
+            snippet_lines = lines[start_line:]
+            full_content = "\n".join(snippet_lines)
+            cleaned = hollow_out_function_bodies(full_content)
+            return cleaned, len(cleaned.splitlines())
+        elif file_ext in brace_languages:
             # 对于大括号语言，使用括号匹配
             end_line = self._find_closing_brace(lines, start_line)
         else:
@@ -824,6 +896,10 @@ def main():
     parser.add_argument('--output', help='输出文件路径')
     parser.add_argument('--append', action='store_true',
                         help='追加模式：向现有文件追加内容，而不是覆盖')
+    parser.add_argument('--clean', choices=['none', 'comments', 'skeleton'], default='none',
+                        help='代码清洗模式：none-不处理, comments-去注释, skeleton-骨架模式')
+    parser.add_argument('--no-junk-filter', action='store_true',
+                        help='禁用垃圾文件过滤（STM32/Unity等自动生成文件）')
 
     args = parser.parse_args()
 
@@ -843,6 +919,12 @@ def main():
 
     # 创建收集器
     collector = CodeCollector(args.project_path, config)
+
+    # 应用命令行清洗参数
+    if args.clean != 'none':
+        collector.clean_mode = args.clean
+    if args.no_junk_filter:
+        collector.remove_junk = False
 
     # 执行收集
     if args.mode == 'batch':
